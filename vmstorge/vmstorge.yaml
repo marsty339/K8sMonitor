@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: monitor-vmstorage
+spec:
+  replicas: 6
+  serviceName: vmstorage
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      vmstorage: online
+  template:
+    metadata:
+      labels:
+        vmstorage: online
+    spec:
+      containers:
+      - args:
+        - --retentionPeriod=1
+        - --storageDataPath=/storage
+        image: victoriametrics/vmstorage:v1.39.4-cluster
+        imagePullPolicy: IfNotPresent
+        name: vmstorage
+        ports:
+        - containerPort: 8482
+          name: http
+          protocol: TCP
+        - containerPort: 8400
+          name: vminsert
+          protocol: TCP
+        - containerPort: 8401
+          name: vmselect
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /data
+          name: data
+      hostNetwork: true
+      nodeSelector:
+        vmstorage: online
+      restartPolicy: Always
+      volumes:
+      - hostPath:
+          path: /data/vmstorage
+          type: ""
+        name: data

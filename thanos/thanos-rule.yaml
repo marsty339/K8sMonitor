@@ -1,0 +1,57 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: query
+  name: thanos-rule
+  namespace: monitoring
+spec:
+  replicas: 1
+  serviceName: "sidecar-rule"
+  selector:
+    matchLabels:
+      app: rule
+  template:
+    metadata:
+      labels:
+        app: rule
+    spec:
+      containers:
+      - image: hub.iflytek.com/iflyos-aiui-service/thanos:v0.17.1
+        name: query
+        imagePullPolicy: IfNotPresent
+        args:
+        - "rule"
+        - "--http-address=0.0.0.0:10902"
+        - "--grpc-address=0.0.0.0:10901"
+        - "--data-dir=/data"
+        - "--rule-file=/prometheus-rules/*.yaml"
+        - "--alert.query-url=http://sidecar-query:19090"
+        - "--alertmanagers.url=http://alertmanager:9093"
+        - "--query=http://sidecar-query:19090"
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts:
+        - mountPath: "/prometheus-rules"
+          name: config-volume
+        - mountPath: "/data"
+          name: data
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+          limits:
+            memory: 1500Mi
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      volumes:
+      - name: config-volume
+        configMap:
+          name: prometheus-rule
+      - name: data
+        hostPath:
+          path: /data/prometheus

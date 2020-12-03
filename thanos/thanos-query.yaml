@@ -1,0 +1,39 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: query
+  name: thanos-query
+  namespace: monitoring
+spec:
+  replicas: 1
+  serviceName: "sidecar-query"
+  selector:
+    matchLabels:
+      app: query
+  template:
+    metadata:
+      labels:
+        app: query
+    spec:
+      containers:
+      - image: hub.iflytek.com/iflyos-aiui-service/thanos:v0.17.1
+        name: query
+        imagePullPolicy: IfNotPresent
+        args:
+        - "query"
+        - "--http-address=0.0.0.0:19090"
+        - "--grpc-address=0.0.0.0:10903"
+        - "--store=dnssrv+_grpc._tcp.prometheus-sidecar-svc.monitoring.svc.cluster.local"
+        - "--store=dnssrv+_grpc._tcp.sidecar-query.monitoring.svc.cluster.local"
+        ports:
+        - name: http-query
+          containerPort: 19090
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet

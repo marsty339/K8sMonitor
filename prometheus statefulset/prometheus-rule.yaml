@@ -1,0 +1,302 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rule
+  namespace: monitoring
+data:
+  k8s_cluster_rule.yaml: |+
+    groups:
+    - name: pod_etcd_monitor
+      rules:
+      - alert: pod_etcd_num_is_changing
+        expr: sum(kube_pod_info{pod=~"etcd.*"})by(monitor) < 3
+        for: 1m
+        labels:
+          level: high
+          service: etcd
+        annotations:
+          summary: "集群:{{ $labels.monitor }},etcd集群pod低于正常总数"
+          description: "总数为3,当前值是{{ $value}}"
+    - name: pod_scheduler_monitor
+      rules:
+      - alert: pod_scheduler_num_is_changing
+        expr: sum(kube_pod_info{pod=~"kube-scheduler.*"})by(monitor) < 3
+        for: 1m
+        labels:
+          level: high
+          service: scheduler
+        annotations:
+          summary: "集群:{{ $labels.monitor }},scheduler集群pod低于正常总数"
+          description: "总数为3,当前值是{{ $value}}"
+    - name: pod_controller_monitor
+      rules:
+      - alert: pod_controller_num_is_changing
+        expr: sum(kube_pod_info{pod=~"kube-controller-manager.*"})by(monitor) < 3
+        for: 1m
+        labels:
+          level: high
+          service: controller
+        annotations:
+          summary: "集群:{{ $labels.monitor }},controller集群pod低于正常总数"
+          description: "总数为3,当前值是{{ $value}}"
+    - name: pod_apiserver_monitor
+      rules:
+      - alert: pod_apiserver_num_is_changing
+        expr: sum(kube_pod_info{pod=~"kube-apiserver.*"})by(monitor) < 3
+        for: 1m
+        labels:
+          level: high
+          service: controller
+        annotations:
+          summary: "集群:{{ $labels.monitor }},apiserver集群pod低于正常总数"
+          description: "总数为3,当前值是{{ $value}}"
+  k8s_master_resource_rules.yaml: |+
+    groups:
+    - name: node_cpu_resource_monitor
+      rules:
+      - alert: 节点CPU使用量
+        expr:  sum(kube_pod_container_resource_requests_cpu_cores{node=~".*"})by(node)/sum(kube_node_status_capacity_cpu_cores{node=~".*"})by(node)>0.7
+        for: 1m
+        labels:
+          level: disaster
+          service: node
+        annotations:
+          summary: "集群NODE节点总的CPU使用核数已经超过了70%"
+          description: "集群:{{ $labels.monitor }},节点:{{ $labels.node }}当前值为{{ $value }}!"
+    - name: node_memory_resource_monitor
+      rules:
+      - alert: 节点内存使用量
+        expr:  sum(kube_pod_container_resource_limits_memory_bytes{node=~".*"})by(node)/sum(kube_node_status_capacity_memory_bytes{node=~".*"})by(node)>0.7
+        for: 1m
+        labels:
+          level: disaster
+          service: node
+        annotations:
+          summary: "集群NODE节点总的memory使用核数已经超过了70%"
+          description: "集群:{{ $labels.monitor }},节点:{{ $labels.node }}当前值为{{ $value }}!"
+    - name: 节点POD使用率
+      rules:
+      - alert: 节点pod使用率
+        expr: sum by(node,monitor) (kube_pod_info{node=~".*"}) / sum by(node,monitor) (kube_node_status_capacity_pods{node=~".*"})> 0.9
+        for: 1m
+        labels:
+          level: disaster
+          service: node
+        annotations:
+          summary: "集群NODE节点总的POD使用数量已经超过了90%"
+          description: "集群:{{ $labels.monitor }},节点:{{ $labels.node }}当前值为{{ $value }}!"      
+    - name: master_cpu_used
+      rules:
+      - alert: 主节点CPU使用率
+        expr:  sum(kube_pod_container_resource_limits_cpu_cores{node=~'master.*'})by(node)/sum(kube_node_status_capacity_cpu_cores{node=~'master.*'})by(node)>0.7
+        for: 1m
+        labels:
+          level: disaster
+          service: node
+        annotations:
+          summary: "集群Master节点总的CPU申请核数已经超过了0.7,当前值为{{ $value }}!"
+          description: "集群:{{ $labels.monitor }},节点:{{ $labels.node }}当前值为{{ $value }}!" 
+    - name: master_memory_resource_monitor
+      rules:
+      - alert: 主节点内存使用率
+        expr:  sum(kube_pod_container_resource_limits_memory_bytes{node=~'master.*'})by(node)/sum(kube_node_status_capacity_memory_bytes{node=~'master.*'})by(node)>0.7
+        for: 1m
+        labels:
+          level: disaster
+          service: node
+        annotations:
+          summary: "集群Master节点总的内存使用量已经超过了70%"
+          description: "集群:{{ $labels.monitor }},节点:{{ $labels.node }}当前值为{{ $value }}!"
+    - name: master_pod_resource_monitor
+      rules:
+      - alert: 主节点POD使用率
+        expr: sum(kube_pod_info{node=~"master.*"}) by (node) / sum(kube_node_status_capacity_pods{node=~"master.*"}) by (node)>0.7
+        for: 1m
+        labels:
+          level: disaster
+          service: node
+        annotations:
+          summary: "集群Master节点总的POD使用数量已经超过了70%"
+          description: "集群:{{ $labels.monitor }},节点:{{ $labels.node }}当前值为{{ $value }}!"     
+  k8s_node_rule.yaml: |+
+    groups:
+    - name: K8sNodeMonitor
+      rules:
+      - alert: 集群节点资源监控
+        expr: kube_node_status_condition{condition=~"OutOfDisk|MemoryPressure|DiskPressure",status!="false"} ==1
+        for: 1m
+        labels:
+          level: disaster
+          service: node
+        annotations:
+          summary: "集群节点内存或磁盘资源短缺"
+          description: "节点:{{ $labels.node }},集群:{{ $labels.monitor }},原因:{{ $labels.condition }}"
+      - alert: 集群节点状态监控
+        expr: sum(kube_node_status_condition{condition="Ready",status!="true"})by(node)  == 1
+        for: 2m
+        labels:
+          level: disaster
+          service: node
+        annotations:
+          summary: "集群节点状态出现错误"
+          description: "节点:{{ $labels.node }},集群:{{ $labels.monitor }}"
+      - alert: 集群POD状态监控
+        expr: sum (kube_pod_container_status_terminated_reason{reason!~"Completed|Error"})  by (pod,reason) ==1
+        for: 1m
+        labels:
+          level: high
+          service: pod
+        annotations:
+          summary: "集群pod状态出现错误"
+          description: "集群:{{ $labels.monitor }},名称:{{ $labels.pod }},原因:{{ $labels.reason}}"
+      - alert: 集群节点CPU使用监控
+        expr:  sum(node_load1) BY (instance) / sum(rate(node_cpu_seconds_total[1m])) BY (instance) > 2
+        for: 5m
+        labels:
+          level: disaster
+          service: node
+        annotations:
+          summary: "机器出现cpu平均负载过高"
+          description: "节点: {{ $labels.instance }}平均每核大于2"
+      - alert: NodeMemoryOver80Percent
+        expr:  (1 - avg by (instance)(node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))* 100 >85
+        for: 1m
+        labels:
+          level: disaster
+          service: node
+        annotations:
+          summary: "机器出现内存使用超过85%"
+          description: "节点: {{ $labels.instance }}"
+  k8s_pod_rule.yaml: |+
+    groups:
+      - name: pod_status_monitor
+        rules:
+        - alert: pod错误状态监控
+          expr: changes(kube_pod_status_phase{phase=~"Failed"}[10m]) >0
+          for: 5m
+          labels:
+            level: high
+            service: pod-failed
+          annotations:
+            summary: "集群:{{ $labels.monitor }}存在pod状态异常"
+            description: "pod:{{$labels.pod}},状态:{{$labels.phase}}"
+        - alert: pod异常状态监控
+          expr: sum(kube_pod_status_phase{phase="Pending"})by(namespace,pod,phase)>0
+          for: 1m
+          labels:
+            level: high
+            service: pod-pending
+          annotations:
+            summary: "集群:{{ $labels.monitor }}存在pod状态pening异常超10分钟"
+            description: "pod:{{$labels.pod}},状态:{{$labels.phase}}"
+        - alert: pod等待状态监控
+          expr: sum(kube_pod_container_status_waiting_reason{reason!="ContainerCreating"})by(namespace,pod,reason)>0
+          for: 1m
+          labels:
+            level: high
+            service: pod-wait
+          annotations:
+            summary: "集群:{{ $labels.monitor }}存在pod状态Wait异常超5分钟"
+            description: "pod:{{$labels.pod}},状态:{{$labels.reason}}"
+        - alert: pod非正常状态监控
+          expr: sum(kube_pod_container_status_terminated_reason{reason!="Completed"})by(namespace,pod,reason)>0
+          for: 5m
+          labels:
+            level: high
+            service: pod-nocom
+          annotations:
+            summary: "集群:{{ $labels.monitor }}存在pod状态Terminated异常超5分钟"
+            description: "pod:{{$labels.pod}},状态:{{$labels.reason}}"
+        - alert: pod重启监控
+          expr: changes(kube_pod_container_status_restarts_total[20m])>3
+          for: 5m
+          labels:
+            level: high
+            service: pod-restart
+          annotations:
+            summary: "集群:{{ $labels.monitor }}存在pod半小时之内重启次数超过3次!"
+            description: "pod:{{$labels.pod}}"
+      - name: deployment_replicas_monitor
+        rules:
+        - alert: deployment监控
+          expr: sum(kube_deployment_status_replicas_unavailable)by(namespace,deployment) >2
+          for: 1m
+          labels:
+            level: high
+            service: deployment-replicas
+          annotations:
+            summary: "集群:{{ $labels.monitor }},deployment:{{$labels.deployment}} 副本数未达到期望值! "
+            description: "空间:{{$labels.namespace}}，当前不可用副本:{{$value}},请检查"
+      - name: daemonset_replicas_monitor
+        rules:
+        - alert: Daemonset监控
+          expr: sum(kube_daemonset_status_desired_number_scheduled - kube_daemonset_status_current_number_scheduled)by(daemonset,namespace) >2
+          for: 1m
+          labels:
+            level: high
+            service: daemonset
+          annotations:
+            summary: "集群:{{ $labels.monitor }},daemonset:{{$labels.daemonset}} 守护进程数未达到期望值!"
+            description: "空间:{{$labels.namespace}},当前不可用副本:{{$value}},请检查"
+      - name: satefulset_replicas_monitor
+        rules:
+        - alert: Satefulset监控
+          expr: kube_statefulset_replicas - kube_statefulset_status_replicas_ready >2
+          for: 1m
+          labels:
+            level: high
+            service: statefulset
+          annotations:
+            summary: "集群:{{ $labels.monitor }},statefulset:{{$labels.statefulset}} 副本数未达到期望值!"
+            description: "空间:{{$labels.namespace}}，当前不可用副本:{{$value}},请检查"
+      - name: pvc_replicas_monitor
+        rules:
+        - alert: PVC监控
+          expr: kube_persistentvolumeclaim_status_phase{phase!="Bound"} == 1
+          for: 5m
+          labels:
+            level: high
+            service: pvc
+          annotations:
+            summary: "集群:{{ $labels.monitor }},statefulset:{{$labels.persistentvolumeclaim}} 异常未bound成功!"
+            description: "pvc出现异常"
+      - name: K8sClusterJob
+        rules:	  
+        - alert: 集群JOB状态监控
+          expr: sum(kube_job_status_failed{job="kubernetes-service-endpoints",k8s_app="kube-state-metrics"})by(job_name) ==1
+          for: 1m
+          labels:
+            level: disaster
+            service: job
+          annotations:
+            summary: "集群存在执行失败的Job"
+            description: "集群:{{ $labels.monitor }},名称:{{ $labels.job_name }}"
+      - name: pod_container_cpu_resource_monitor
+        rules:
+        - alert: 容器内cpu占用监控
+          expr: namespace:container_cpu_usage_seconds_total:sum_rate / sum(kube_pod_container_resource_limits_cpu_cores) by (monitor,namespace,pod_name)> 0.8
+          for: 1m
+          labels:
+            level: high
+            service: container_cpu
+          annotations:
+            summary: "集群:{{ $labels.monitor }} 出现Pod CPU使用率已经超过申请量的80%,"
+            description: "namespace:{{$labels.namespace}}的pod:{{$labels.pod}},当前值为{{ $value }}"
+        - alert: 容器内mem占用监控
+          expr: namespace:container_memory_usage_bytes:sum/ sum(kube_pod_container_resource_limits_memory_bytes)by(monitor,namespace,pod_name) > 0.8
+          for: 2m
+          labels:
+            level: high
+            service: container_mem
+          annotations:
+            summary: "集群:{{ $labels.monitor }} 出现Pod memory使用率已经超过申请量的90%"
+            description: "namespace:{{$labels.namespace}}的pod:{{$labels.pod}},当前值为{{ $value }}"
+        
+  redis_rules.yaml: |+
+    groups:
+    - name: k8s_container_rule
+      rules:
+      - expr: sum(rate(container_cpu_usage_seconds_total[5m])) by (monitor,namespace,pod_name)
+        record: namespace:container_cpu_usage_seconds_total:sum_rate
+      - expr: sum(container_memory_usage_bytes{container_name="POD"}) by (monitor,namespace,pod_name)
+        record: namespace:container_memory_usage_bytes:sum

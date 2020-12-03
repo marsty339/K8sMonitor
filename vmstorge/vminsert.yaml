@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: monitor-vminsert
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      vminsert: online
+  template:
+    metadata:
+      labels:
+        vminsert: online
+    spec:
+      containers:
+      - args:
+        - -storageNode=vmstorage:8400
+        image: victoriametrics/vminsert:v1.39.4-cluster
+        imagePullPolicy: IfNotPresent
+        name: vminsert
+        ports:
+        - containerPort: 8480
+          name: vminsert
+          protocol: TCP
+      dnsPolicy: ClusterFirst
+      hostNetwork: true
+      nodeSelector:
+        vminsert: online
+      restartPolicy: Always
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate

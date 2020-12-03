@@ -1,0 +1,88 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: prometheus
+  name: prometheus-sts
+  namespace: monitoring
+spec:
+  serviceName: "prometheus"
+  replicas: 2
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - image: hub.iflytek.com/iflyos-aiui-service/prometheus:2.20.0-hash4
+        name: prometheus
+        securityContext:
+           runAsUser: 0
+        command:
+        - "/bin/entrypoint.sh"
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        ports:
+        - name: http
+          containerPort: 9090
+          protocol: TCP
+        volumeMounts:
+        - mountPath: "/etc/prometheus"
+          name: config-volume
+        - mountPath: "/prometheus"
+          name: data
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1000Mi
+          limits:
+            memory: 50000Mi
+            memory: 20000Mi
+      - image: hub.iflytek.com/iflyos-aiui-service/thanos:v0.17.1
+        name: thanos
+        imagePullPolicy: IfNotPresent
+        args:
+        - "sidecar"
+        - "--grpc-address=0.0.0.0:10901"
+        - "--grpc-grace-period=1s"
+        - "--http-address=0.0.0.0:10902"
+        - "--http-grace-period=1s"
+        - "--prometheus.url=http://127.0.0.1:9090"
+        - "--tsdb.path=/prometheus"
+        - "--log.level=info"
+        - "--objstore.config-file=/etc/prometheus/bucket.yaml"
+        ports:
+        - name: http-sidecar
+          containerPort: 10902
+        - name: grpc-sidecar
+          containerPort: 10901
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts:
+        - mountPath: "/etc/prometheus"
+          name: config-volume
+        - mountPath: "/prometheus"
+          name: data
+      serviceAccountName: prometheus
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      imagePullSecrets: 
+        - name: regsecret
+      volumes:
+      - name: config-volume
+        configMap:
+          name: prometheus-conf2
+      - name: data
+        hostPath:
+          path: /data/prometheus

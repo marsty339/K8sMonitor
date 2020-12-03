@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    vminsert: online
+  name: monitor-vminsert
+spec:
+  ports:
+  - name: vminsert
+    port: 8480
+    protocol: TCP
+    targetPort: vminsert
+  selector:
+    vminsert: online
+  type: NodePort
