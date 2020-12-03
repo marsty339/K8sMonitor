@@ -18,7 +18,7 @@ spec:
         app: prometheus
     spec:
       containers:
-      - image: hub.iflytek.com/iflyos-aiui-service/prometheus:2.20.0-hash4
+      - image: prometheus:2.20.0-hash4
         name: prometheus
         securityContext:
            runAsUser: 0
@@ -46,7 +46,7 @@ spec:
           limits:
             memory: 50000Mi
             memory: 20000Mi
-      - image: hub.iflytek.com/iflyos-aiui-service/thanos:v0.17.1
+      - image: thanos:v0.17.1
         name: thanos
         imagePullPolicy: IfNotPresent
         args:
