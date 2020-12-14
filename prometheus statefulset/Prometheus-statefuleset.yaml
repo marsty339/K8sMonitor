@@ -44,7 +44,6 @@ spec:
             cpu: 500m
             memory: 1000Mi
           limits:
-            memory: 50000Mi
             memory: 20000Mi
       - image: thanos:v0.17.1
         name: thanos
